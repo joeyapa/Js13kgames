@@ -1,2 +1,2 @@
-# Js3kgames
-Compilation of entries for Js3kgames gamejam.
+# Js13kgames
+Compilation of entries for Js13kgames gamejam.
