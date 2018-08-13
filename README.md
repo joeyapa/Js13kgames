@@ -1,10 +1,12 @@
 # Js13kgames
 Compilation of entries for Js13kgames gamejam.
 
-2018
-Theme: Not yet announced
-Description:Not yet announced
+2018<br />
+Theme: Not yet announced<br />
+Description:Not yet announced<br />
 
-2017 ADRIFT
-Theme: Lost
-Description: An isometric build and protect game, in search for lost treasures
+<br />
+
+2017 ADRIFT<br />
+Theme: Lost<br />
+Description: An isometric build and protect game, in search for lost treasures<br />
