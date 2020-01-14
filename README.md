@@ -5,9 +5,9 @@ Compilation of entries for Js13kgames gamejam.
 Theme: <br />
 Description: <br />
 <br />
-2019: No Entry<br />
+2019: Tailgun<br />
 Theme: Back<br />
-Description: Wasn't able to make it this year.<br />
+Description: Wasn't able to make it this year, but has made a prototype that you can find it in <a href="https://rankaru.com/js13k/2019/tailgun">https://rankaru.com/js13k/2019/tailgun</a><br />
 <br />
 2018: Offline Mobile Gear<br />
 Theme: Offline<br />
