@@ -4,9 +4,11 @@ Compilation of entries for Js13kgames gamejam.
 2020:<br />
 Theme: <br />
 Description: <br />
+<br />
 2019: No Entry<br />
 Theme: Back<br />
 Description: Wasn't able to make it this year.<br />
+<br />
 2018: Offline Mobile Gear<br />
 Theme: Offline<br />
 Description: Mecha hack and slash game. It has a resurrection game concept.<br />
