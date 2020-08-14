@@ -1,9 +1,9 @@
 # Js13kgames
 Compilation of entries for Js13kgames gamejam.
 
-2020:<br />
-Theme: <br />
-Description: <br />
+2020: Lost Packet<br />
+Theme: 404 <br />
+Description: HTML 404 Page Not Found Error<br />
 <br />
 2019: Tailgun<br />
 Theme: Back<br />
