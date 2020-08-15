@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Drawing Canvas Pixel</title>
+	<style type="text/css">
+		canvas, img {
+			image-rendering: -moz-crisp-edges;
+			image-rendering: -webkit-crisp-edges;
+			image-rendering: pixelated;
+			image-rendering: crisp-edges;
+		}
+	</style>
+	<script type="text/javascript">
+		/*
+		Task: 
+		[add] left/right of layer
+		[add] left/right of spritesheet
+		
+		[major] animation sheet
+		  - animation is tied to project
+		  - multiple animation
+		  - define the spritesheet, layer numbers or layerall, delay, transition/clear,                                                                        
+		  - add validation to remove project
+		  - add validation to remove, shift layer
+
+		*/
+
+		var canvas, 
+			context, 
+			canvassize=320, 
+			dimension=32, 
+			pixelsize,
+			project={
+				id:new Date().getUTCMilliseconds(), 
+				name:'', 
+				modified:false, 
+				spritesheet:[{sequence:0, layer:[{component:[],dataurl:''}], dataurl:'', layerindex:0}], 
+				spritesheetindex:0 };
+		
+		var pallete = [], 
+			palleteindex=0, 
+			palletestring = "ffffffead4aae8b796c28569b86f50e4a672d77643be4a2f733e393e2731a22633e43b44ff0044f6757ab5508868386cf77622feae34fee76163c74d3e8948265c42193c3e124e890099db2ce8f5c0cbdc8b9bb45a69883a4466262b44181425";
+
+		/**
+		 *	On windows load event listener
+		 */
+		window.addEventListener('load',function(){
+			canvas = $('c');
+			context = canvas.getContext('2d');	
+			canvas.width = canvassize; 
+			canvas.height = canvassize;
+			pixelsize = canvassize/dimension;
+			
+			Storage.list();
+
+			Layer.list();
+
+			Sheet.list();
+
+			var refreshEvent = function(e) {
+				Layer.list(); 
+			 	Sheet.list(); 
+			 	Render.update();
+			}
+
+			var newProjectEvent = function(e) {
+				if( project.modified && !confirm('Current project is not yet saved. Click OK to abandon current project.') ) {
+					return;
+				}			
+				$('select-project').selectedIndex = -1;
+				Storage.new(); 				
+			 	refreshEvent(e);
+			}
+
+			var saveProjectEvent = function(e) { 				
+				Storage.save(); 
+				Storage.list(); 
+				refreshEvent(e);
+				$('select-project').value = project.id; 				
+
+				// temporary export
+				let s = Dataport.exportSheet(project.spritesheetindex);
+				console.debug(s.length,s);
+				$('txt-exported').innerHTML = 'length='+s.length+', e="'+s+'"';
+			}
+
+			
+
+			$('text-project-name').addEventListener('keyup',function(){ 
+				project.name = this.value; project.modified=true; 
+			});
+	
+			$('btn-upload-path').addEventListener('click', function(){
+				let v = $('text-upload-path').value;
+				if( v ) {
+					let image = new Image();
+					image.src = v;					
+					image.onload = function(){
+						Pantone.loadimage(image);	
+					}
+					
+				}
+			});
+			
+			$('btn-color-byindex').addEventListener('click', function(){
+				Pantone.colorByIndex();
+			});
+			
+			$('btn-new-project').addEventListener('click', newProjectEvent);
+			
+			$('btn-save-project').addEventListener('click', saveProjectEvent);
+			
+			$('btn-clone-project').addEventListener('click',function(){				
+				if( project.name == '' ) {
+					alert('Project name cannot be empty.')
+					return;
+				}
+				if( project.modified && !confirm('Current project is not yet saved. Click OK to abandon current project, and clone this to a new project') ) {
+					return;
+				}
+				project.id = new Date().getUTCMilliseconds();
+				project.name = project.name+' Copy';
+				$('text-project-name').value = project.name;
+				project.modified = true;				
+			});			
+
+			$('btn-delete-project').addEventListener('click',function(){
+				Storage.remove();
+			});		
+
+			$('select-project').addEventListener('change', function(e){ 
+			 	if( project.modified && !confirm('Current project is not yet saved. Click OK to abandon current project.') ) {
+			 		$('select-project').value = project.id;
+					return;
+				}
+				if( $('select-project').value=='' ) {					
+					Storage.new(); 									
+				}
+				else {
+					// 1. To do refresh page load, then load. This is to clear existing javascript memory leak
+					Storage.load(); 	
+				}
+			 	
+			 	refreshEvent(e);
+			 });
+
+			$('select-pen-size').addEventListener('change', function(e){ 
+				Pantone.pensize = $('select-pen-size').value;
+	 		});			
+
+			$('btn-grid-toggle').addEventListener('click',Grid.toggle);
+			$('btn-grid-draw').addEventListener('click',Pantone.draw);
+			$('btn-grid-erase').addEventListener('click',Pantone.erase);
+			$('btn-grid-move').addEventListener('click',Pantone.move);			
+			$('btn-grid-erasefill').addEventListener('click',Pantone.erasefill);			
+			
+
+			$('btn-layers-delete').addEventListener('click',function(){				
+				project.spritesheet[project.spritesheetindex].layer.splice(project.spritesheet[project.spritesheetindex].layerindex,1);
+				Layer.list(); 
+			});
+
+			$('btn-layers-clone').addEventListener('click',function(){
+				let c = JSON.parse(JSON.stringify(project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex]));
+				project.spritesheet[project.spritesheetindex].layer.push(c);
+				Layer.list(); 
+			});
+
+			$('btn-layers-shiftleft').addEventListener('click',function(){
+				if( project.spritesheet[project.spritesheetindex].layerindex > 0 ) {
+					let c = project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex-1];
+					project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex-1] = project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex];
+					project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex] = c;
+					project.spritesheet[project.spritesheetindex].layerindex--;
+					Layer.list(); 
+				}
+			});
+
+			$('btn-layers-shiftright').addEventListener('click',function(){
+				if( project.spritesheet[project.spritesheetindex].layerindex < project.spritesheet[project.spritesheetindex].layer.length-1 ) {
+					let c = project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex+1];
+					project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex+1] = project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex];
+					project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex] = c;
+					project.spritesheet[project.spritesheetindex].layerindex++;
+					Layer.list(); 
+				}
+			});			
+
+
+			$('btn-sheets-delete').addEventListener('click',function(){
+				project.spritesheet.splice(project.spritesheetindex,1);
+				Sheet.list();
+			});
+
+			$('btn-sheets-clone').addEventListener('click',function(e){
+				let s = JSON.parse(JSON.stringify(project.spritesheet[project.spritesheetindex]));
+				project.spritesheet.push(s);
+				refreshEvent(e);
+			});
+
+			$('btn-sheets-shiftleft').addEventListener('click',function(){
+				if( project.spritesheetindex > 0 ) {
+					let c = project.spritesheet[project.spritesheetindex-1];
+					project.spritesheet[project.spritesheetindex-1] = project.spritesheet[project.spritesheetindex];
+					project.spritesheet[project.spritesheetindex] = c;
+					project.spritesheetindex--;
+					Sheet.list();
+				}								
+			});
+
+			$('btn-sheets-shiftright').addEventListener('click',function(){
+				if( project.spritesheetindex < project.spritesheet.length-1 ) {
+					let c = project.spritesheet[project.spritesheetindex+1];
+					project.spritesheet[project.spritesheetindex+1] = project.spritesheet[project.spritesheetindex];
+					project.spritesheet[project.spritesheetindex] = c;
+					project.spritesheetindex++;
+					Sheet.list();
+				}				
+			});
+
+
+			
+			// click event						
+			canvas.addEventListener('mousedown',function(e){
+				Pantone.pendown = true;
+				if( e.button==2 ) {
+					Pantone.penright = true;
+					Pantone.stateright = Pantone.state;
+					Pantone.erase();					
+				}
+				Pantone.addColorCanvas(e);				
+			});
+
+			canvas.addEventListener('mouseup',function(e){
+				Pantone.pendown = false;
+				if(Pantone.penright){
+					Pantone.penright=false;
+					Pantone.state = Pantone.stateright;
+				}
+				Mouse.px = 0;
+				Mouse.py = 0;
+				Layer.list();
+				Sheet.list();
+			});
+			canvas.addEventListener('mouseout',function(e){
+				Pantone.pendown = false;
+				if(Pantone.penright){
+					Pantone.penright=false;
+					Pantone.state = Pantone.stateright;
+				}
+				Mouse.px = 0;
+				Mouse.py = 0;
+				Layer.list();
+				Sheet.list();
+			});
+
+			canvas.addEventListener('mousemove',function(e){
+				if( Pantone.pendown || Pantone.penright) {
+					Pantone.addColorCanvas(e);	
+					e.preventDefault();
+				}				
+			});
+			canvas.addEventListener('contextmenu', function(e) {
+				e.preventDefault();
+			}, false);				
+
+
+			/**
+			 *	On windows keydown event listener 
+			 *	Provides keyboard shortcut functions
+			 */
+			window.addEventListener('keydown',function(e){
+				if( e.ctrlKey ) {
+					switch(e.keyCode){					
+						case 83: saveProjectEvent(e); e.preventDefault(); break; // ctrl+S: save				
+					}
+				}
+				else if( e.shiftKey ) {
+					switch(e.keyCode){
+						case 49: Pantone.colorquickkey[0]=palleteindex; break;
+						case 50: Pantone.colorquickkey[1]=palleteindex; break;
+						case 51: Pantone.colorquickkey[2]=palleteindex; break;
+						case 52: Pantone.colorquickkey[3]=palleteindex; break;
+						case 53: Pantone.colorquickkey[4]=palleteindex; break;
+						case 54: Pantone.colorquickkey[5]=palleteindex; break;
+						case 55: Pantone.colorquickkey[6]=palleteindex; break;
+						case 56: Pantone.colorquickkey[7]=palleteindex; break;
+						case 57: Pantone.colorquickkey[8]=palleteindex; break;
+						case 58: Pantone.colorquickkey[9]=palleteindex;  break;
+						case 67: break; // ctrl+C: clone						
+						case 78: break; // ctrl+N: new					
+						// ctrl-ArrowLeft: layer index left
+						// ctrl-ArrowRight: layer index right
+					}
+				}
+				else {
+					switch(e.keyCode){
+						case 49: Pantone.selectColorQuickKey(0); break;
+						case 50: Pantone.selectColorQuickKey(1); break;
+						case 51: Pantone.selectColorQuickKey(2); break;
+						case 52: Pantone.selectColorQuickKey(3); break;
+						case 53: Pantone.selectColorQuickKey(4); break;
+						case 54: Pantone.selectColorQuickKey(5); break;
+						case 55: Pantone.selectColorQuickKey(6); break;
+						case 56: Pantone.selectColorQuickKey(7); break;
+						case 57: Pantone.selectColorQuickKey(8); break;
+						case 58: Pantone.selectColorQuickKey(9);  break;
+						case 68: Pantone.draw(); break; // D: Draw
+						case 69: Pantone.erase(); break; // E: erase
+						case 71: Grid.toggle(); break; // G: grid
+						case 76: break; // L: layer toggle					
+						case 77: Pantone.move(); break; // M: move 
+					}	
+					console.debug('key code '+e.keyCode);
+				}
+				
+			});	
+
+			// color picker
+			Pantone();
+			
+			
+			// initiate the initial update
+			Render();
+			
+		});
+
+		
+
+		/**
+		 *	Pantone 
+		 */
+		function Pantone(){	
+			Pantone.editlist();
+			for(var i=0;i<10;i++) {
+				Pantone.colorquickkey.push(0);
+			}
+		}
+
+		Pantone.state = 0;
+
+		Pantone.stateright = 0;
+
+		Pantone.pensize = 1;
+
+		Pantone.pendown = false;
+
+		Pantone.penright = false;
+
+		Pantone.colorquickkey = [];
+
+		Pantone.selectColorQuickKey = function(index){
+			palleteindex = Pantone.colorquickkey[index];
+			Pantone.selectlist();			
+		} 
+
+		Pantone.addColorCanvas = function(e){
+			var pos = Mouse.getCursorPosition(canvas,e), x = Math.floor(pos.x/pixelsize)*pixelsize, y = Math.floor(pos.y/pixelsize)*pixelsize;
+			var layer = project.spritesheet[project.spritesheetindex].layer;
+			var layerindex = project.spritesheet[project.spritesheetindex].layerindex;
+			var component = project.spritesheet[project.spritesheetindex].layer[layerindex].component;
+
+			if( Pantone.state===0 ) { // draw
+				for(let i=0;i<Pantone.pensize;i++){
+					Pantone.drawInCanvas(pos,i,pallete[palleteindex],palleteindex);
+				}
+				
+			}
+			else if( Pantone.state===1 ) { // erase
+				for(var i=0;i<component.length;i++){
+					if( component[i].x==x && component[i].y==y ) {
+						project.spritesheet[project.spritesheetindex].layer[layerindex].component.splice(i,1);
+						break;
+					}
+				}
+			}
+			else if( Pantone.state===2 && Mouse.px!=0 && Mouse.py!=0) { // move
+				var dx = x-Mouse.px, dy = y-Mouse.py;
+				for(var i=0;i<component.length;i++){
+					
+					project.spritesheet[project.spritesheetindex].layer[layerindex].component[i].x+=dx;
+					project.spritesheet[project.spritesheetindex].layer[layerindex].component[i].y+=dy;
+					
+					
+				}
+			}	
+			else if( Pantone.state===3) {
+				Pantone.clearInCanvas(pos);
+			}
+
+			// hide the grid to before creating a canvas shot, reduce the pixel size
+			var gridhold = Grid.show;
+			var pixelsizehold = pixelsize;
+
+			Grid.show = false;
+			//pixelsize = Math.floor(dimension*2); 
+
+			/* layer data url */
+			for(var l=0;l<layer.length;l++) { 
+				context.clearRect(0, 0, canvassize, canvassize);	
+				Render.updateComponent(project.spritesheet[project.spritesheetindex].layer[l].component);
+				project.spritesheet[project.spritesheetindex].layer[l].dataurl=canvas.toDataURL();
+			}
+			
+			// spritesheet data url
+			/* */
+
+			var flat = Sheet.flat(project.spritesheetindex);		
+			context.clearRect(0, 0, canvassize, canvassize);	
+			Render.updateComponent(flat);
+			//Render.update();
+			project.spritesheet[project.spritesheetindex].dataurl=canvas.toDataURL();			
+
+			Grid.show = gridhold;
+			pixelsize = pixelsizehold;
+
+			project.modified=true;
+
+			Mouse.px = x;
+			Mouse.py = y;
+		}
+
+		Pantone.draw = function(){
+			Pantone.state = 0;
+			canvas.style.cursor = 'default';
+		}
+
+		Pantone.drawInCanvas = function(pos,id,c,ci){
+			let x2 = (Math.floor((pos.x)/pixelsize)+id)*pixelsize;
+			let y2 = (Math.floor((pos.y)/pixelsize)+id)*pixelsize;
+			let layerindex = project.spritesheet[project.spritesheetindex].layerindex;
+			let component = project.spritesheet[project.spritesheetindex].layer[layerindex].component;
+
+			for(let i=0;i<component.length;i++){
+				if( component[i].x==x2 && component[i].y==y2 ) {
+					project.spritesheet[project.spritesheetindex].layer[layerindex].component.splice(i,1);
+					break;
+				}
+			}				
+
+			project.spritesheet[project.spritesheetindex].layer[layerindex].component.push({x:x2,y:y2,color:c,colorindex:ci});	
+
+		}
+
+		Pantone.clearInCanvas = function(pos) {
+			let x2 = (Math.floor((pos.x)/pixelsize))*pixelsize;
+			let y2 = (Math.floor((pos.y)/pixelsize))*pixelsize;
+			let layerindex = project.spritesheet[project.spritesheetindex].layerindex;
+			let component = project.spritesheet[project.spritesheetindex].layer[layerindex].component;
+
+			let colorindex = -1;
+			for(let i=0;i<component.length;i++){
+				if( component[i].x==x2 && component[i].y==y2 ) {
+					colorindex = component[i].colorindex;
+					break;
+				}
+			}	
+			for(let i=0;i<component.length;i++){
+				if( component[i].colorindex == colorindex ) {
+					project.spritesheet[project.spritesheetindex].layer[layerindex].component.splice(i,1);	
+					i=0;				
+				}
+			}
+		}
+
+		Pantone.erase = function(){
+			Pantone.state = 1;
+			canvas.style.cursor = 'default';
+		}
+
+		Pantone.erasefill = function(){
+			Pantone.state = 3;
+			canvas.style.cursor = 'cell';
+		}
+
+		
+
+		Pantone.move = function(){
+			Pantone.state = 2;
+			canvas.style.cursor = 'move';	
+		}
+
+		Pantone.editlist = function(){
+			
+			// assign the color pallet
+			let s = '';
+			for(let i=0;i<palletestring.length;i=i+6){			
+				pallete.push('#'+palletestring.substring(i,i+6));
+			}			
+
+			// create pallete list 
+			$('div-color-picker').innerHTML = '';
+			for(var i=0;i<pallete.length;i++){
+				var div = document.createElement("DIV"); 
+				div.setAttribute('pallete-index',i);
+				Object.assign(div.style, {background:pallete[i],height:'32px',width:'32px',float:'left'});
+				$('div-color-picker').appendChild(div);
+				div.addEventListener('click',function(e){
+					palleteindex = parseInt(this.getAttribute('pallete-index'));
+					Pantone.selectlist();					
+				});
+			}
+
+			Pantone.clearlist();			
+		}
+
+		Pantone.clearlist = function() {
+			var div = $('div-color-picker').getElementsByTagName('DIV');
+			for(var i=0;i<div.length;i++) {
+				div[i].style.border='solid 2px ' + div[i].style.background;
+			}
+		}
+
+		Pantone.selectlist = function() {
+			Pantone.clearlist();
+			var div = $('div-color-picker').getElementsByTagName('DIV');			
+			div[palleteindex].style.border = 'solid 2px #000';
+		}
+
+
+		Pantone.colorByIndex = function() {
+			let c = project.spritesheet[project.spritesheetindex].layer[project.spritesheet[project.spritesheetindex].layerindex];
+			for(let i=0;i<c.component.length;i++) {
+				c.component[i].color = pallete[c.component[i].colorindex];
+			}
+			project.modified = true;	
+		}
+
+		Pantone.loadimage = function(img) {
+			project.modified = false;
+			context.clearRect(0, 0, canvassize, canvassize);	
+			context.drawImage(img, 0, 0, canvassize, canvassize);
+			let imgdata = context.getImageData(0, 0, canvassize, canvassize);
+			let pixelArray = imgdata.data;
+			var length = pixelArray.length / 4; // 4 components - red, green, blue and alpha - 102400 320x320
+
+			// console.debug('l=',length, Math.floor( (length/canvassize)));
+
+			let rgbToHex = function (rgb) { 
+			  var hex = Number(rgb).toString(16);
+			  if (hex.length < 2) {
+			       hex = "0" + hex;
+			  }
+			  return hex;
+			};
+
+			let hexToRgb = function (hex) {
+				hex = hex.substring(1, hex.length);
+				var r = parseInt((hex).substring(0, 2), 16);
+				var g = parseInt((hex).substring(2, 4), 16);
+				var b = parseInt((hex).substring(4, 6), 16);
+
+				return [r, g, b];
+			}
+
+			let fullColorHex = function(r,g,b) {   
+				var red = rgbToHex(r);
+				var green = rgbToHex(g);
+				var blue = rgbToHex(b);
+				return '#'+red+green+blue;
+			};
+
+			let colorDistance = function(color1, color2) {
+				let result = 0; 
+				for (let i = 0; i < color1.length; i++)
+				result += (color1[i] - color2[i]) * (color1[i] - color2[i]);
+				return result;
+			}
+
+			let nearestPantone = function(r,g,b){
+				let nearest = pallete[0], d = 5000;
+				for(let i=0;i<pallete.length;i++){
+					let nd = colorDistance(hexToRgb(pallete[i]), [r,g,b]);
+					if( nd < d -200 ) {
+						d = nd;
+						nearest = i;
+					}
+				}
+				return nearest;
+			}
+
+			let x=0,y=0;	
+			for (let i = 0; i < length; i=i+10) {
+			    var index = 4 * i;
+
+			    var r = pixelArray[index];
+			    var g = pixelArray[++index];
+			    var b = pixelArray[++index];
+			    var a = pixelArray[++index];
+			    var pos = {x:(x*pixelsize),y:(y*pixelsize)};
+			    
+			    if(pos.x>320) {
+
+			    }
+			    else if( r>250&&g>250&&b>250 ){
+
+			    }
+			    else {
+			    	let pi = nearestPantone(r,g,b);
+			    	Pantone.drawInCanvas(pos,0,fullColorHex(r,g,b),pi);			    	
+			    }
+				
+				x++;	
+				if(x>=320) { x=0; y++; }
+				if(y>=320) { break; }
+			}
+			project.modified = true;
+
+		}
+		
+
+		function Render(){
+			if(project.modified) {
+				Render.update();
+			}
+			window.requestAnimationFrame(Render);
+		}		
+
+		Render.update = function() {			
+			var layer = project.spritesheet[project.spritesheetindex].layer;
+			context.clearRect(0, 0, canvassize, canvassize);		
+			Grid.update();
+			for(var l=0; l<layer.length; l++) {
+				var component = project.spritesheet[project.spritesheetindex].layer[l].component;
+				Render.updateComponent(component);
+			}			
+		}
+
+		Render.updateComponent = function(component) {	
+			for(var i=0; i<component.length; i++) {				
+				context.beginPath();
+				context.globalAlpha=component[i].opacity ? component[i].opacity : 1;
+				context.fillStyle=component[i].color;
+				context.fillRect(component[i].x, component[i].y, pixelsize, pixelsize);			
+				context.globalAlpha=1.0;
+			}		
+		}
+
+
+		function Mouse() { }
+
+		Mouse.px = 0; Mouse.py = 0;
+
+		Mouse.getCursorPosition = function(canvas, event) {
+			var x, y;
+			x = event.clientX + document.body.scrollLeft + document.documentElement.scrollLeft - Math.floor(canvas.offsetLeft);
+			y = event.clientY + document.body.scrollTop + document.documentElement.scrollTop - Math.floor(canvas.offsetTop) + 1;
+			return {x:x,y:y};
+		}
+
+
+		/**
+		 *	Grid 
+		 */	 
+		function Grid() { }
+
+		Grid.show = true;
+
+		Grid.update = function() {
+			if( Grid.show ) {
+				context.beginPath(); 	
+				context.strokeStyle = '#111';
+				context.lineWidth=0.1;
+				for(var i=pixelsize;i<canvassize;i=i+pixelsize) {										
+					context.moveTo(i,0);
+					context.lineTo(i,canvassize);
+					
+				}
+				for(var i=pixelsize;i<canvassize;i=i+pixelsize) { 		
+					context.moveTo(0,i);
+					context.lineTo(canvassize,i);					
+				}
+				context.stroke();	
+			}			
+		}
+
+		Grid.toggle = function() {
+			Grid.show = Grid.show ? false : true;
+			project.modified = true;
+		}
+
+
+		/**
+		 *	Storage 
+		 */
+		function Storage() { }
+
+		Storage.new = function() {
+			// explicity clear
+			project = Commons.clone({id:new Date().getUTCMilliseconds(), name:'', modified:false, spritesheet:[{sequence:0, layer:[{component:[],dataurl:''}], dataurl:'', layerindex:0}], spritesheetindex:0 })
+			project.id = new Date().getUTCMilliseconds();
+			project.modified=true;
+			$('text-project-name').value = project.name;
+		}
+
+		Storage.save = function(){
+			project.name = $('text-project-name').value.trim();
+			
+			if( !project.name || project.name == '' ) {
+				alert('Project name cannot be empty.')
+				return;
+			}
+
+			if( project.modified ) {								
+				var p = JSON.stringify(project);
+				try {
+					// console.debug('save',p);
+					JSON.parse(p);
+				} catch(e){ 
+					console.debug(p,e);
+					alert('Error in saving project, cannot be parse back to original value.'); 
+					return;
+				}
+				localStorage.setItem(project.id,p);
+				alert('Successfully save project.')
+			}
+			else {
+				console.debug('Project not modified, no need to save.')
+				alert('Project is not modified, will not save.')
+			}
+			project.modified=false;
+		}
+
+		Storage.load = function(){			
+			try {
+				var ps = localStorage.getItem($('select-project').value);
+				var p = JSON.parse(ps);
+				project = p;
+			} catch(e) {
+				console.debug(ps,e);
+				alert('Error in loading project, cannot be parse back to original value.'); 
+			}
+
+			$('text-project-name').value = project.name;
+			$('select-project').value = project.id;
+			console.debug('load',project);
+			project.modified=false;
+		}
+
+		Storage.remove = function(){
+			if( confirm('Continue to delete '+project.name+'?') ) {
+				localStorage.removeItem($('select-project').value);	
+				$('text-project-name').value = '';	
+				Storage.list();
+				Layer.list();
+				// spritesheet.list();
+				
+			}
+			
+		}	
+
+		Storage.list = function(){
+			var s = $('select-project');
+			s.options.length = 0;
+			var o = document.createElement("OPTION"); 
+			o.value = '';
+    		s.appendChild(o);
+
+			for (let i = 0; i < localStorage.length; i++){
+				try {
+					var id = localStorage.key(i);
+					var p = JSON.parse(localStorage.getItem(id));
+					var o = document.createElement("OPTION"); 
+					o.value = id;
+					o.text = p.name;
+    				s.appendChild(o);
+				} catch(e){
+					console.debug(e);
+				}
+    			
+			}
+		}
+
+		/**
+		 *	Layer 
+		 */
+		function Layer() { }
+
+		Layer.list = function() {
+			var layers = $('div-layers');
+			layers.innerHTML = '';			
+			for(var l=0;l<project.spritesheet[project.spritesheetindex].layer.length;l++) {
+				var c = document.createElement('IMG'); 
+				c.setAttribute('layer-index',l);	
+				if( project.spritesheet[project.spritesheetindex].layer[l].dataurl ) {
+					c.src = project.spritesheet[project.spritesheetindex].layer[l].dataurl;
+				}	
+				Object.assign(c.style, {border:'solid 1px #ddd',height:'64px',width:'64px',margin:'0 2px',float:'left'});
+
+				if( l==project.spritesheet[project.spritesheetindex].layerindex ) {
+					Object.assign(c.style, {border:'solid 2px #f00'});					
+				}				
+
+				layers.appendChild(c);				
+				c.addEventListener('click',function(e){
+					project.spritesheet[project.spritesheetindex].layerindex = parseInt(this.getAttribute('layer-index'));
+					Layer.list();
+				});
+			}
+
+			var n = document.createElement('DIV'); 
+			n.setAttribute('layer-index',project.spritesheet[project.spritesheetindex].layer.length);
+			Object.assign(n.style, {border:'solid 1px #ddd',height:'64px',width:'64px',margin:0,padding:0,'line-height':'64px',float:'left','text-align':'center','font-weight':'bold','font-size':'64px',color:'#777',cursor:'pointer'});
+			n.innerHTML = "&#43;";
+			layers.appendChild(n);
+			n.addEventListener('click',function(e){								
+				project.spritesheet[project.spritesheetindex].layer.push({component:[]});
+				project.spritesheet[project.spritesheetindex].layerindex = project.spritesheet[project.spritesheetindex].layer.length-1;				
+				Layer.list();
+			});
+		}
+
+		/**
+		 *	Sheet 
+		 */
+		function Sheet() { }
+
+		Sheet.list = function() {
+			var sheets = $('div-sheets');
+			sheets.innerHTML = '';
+			for(var i=0;i<project.spritesheet.length;i++) {
+				var c = document.createElement('IMG'); 
+				c.setAttribute('spritesheet-index',i);	
+
+				if( project.spritesheet[i].dataurl ) {
+					c.src = project.spritesheet[i].dataurl;
+				}		
+				else {
+					// TOOD: use dumming image to add 
+				}
+					
+				Object.assign(c.style, {border:'solid 1px #ddd',height:'64px',width:'64px',margin:0,padding:0,float:'left'});
+
+				if( i==project.spritesheetindex) {
+					Object.assign(c.style, {border:'solid 2px #f00'});					
+				}
+
+				sheets.appendChild(c);
+				c.addEventListener('click',function(e){
+					project.spritesheetindex = parseInt(this.getAttribute('spritesheet-index'));
+					Layer.list();
+					Sheet.list();
+				});
+
+			}
+
+
+			var n = document.createElement('DIV'); 
+			n.setAttribute('spritesheet-index',project.spritesheet.length);
+			Object.assign(n.style, {border:'solid 1px #ddd',height:'64px',width:'64px',margin:0,padding:0,'line-height':'64px',float:'left','text-align':'center','font-weight':'bold','font-size':'64px',color:'#777',cursor:'pointer'});
+			n.innerHTML = "&#43;";
+			sheets.appendChild(n);
+			n.addEventListener('click',function(e){				
+				project.spritesheet.push({sequence:project.spritesheet.length-1, layer:[{component:[]}], layerindex:0}); 
+				project.spritesheetindex = project.spritesheet.length-1;				
+				Layer.list();
+				Sheet.list();
+			});
+		}
+
+		Sheet.flat = function(index){
+			var sprite = project.spritesheet[index];
+			var flatlayer = [];
+			var addComponent = function(cn){
+				for(var a=0;a<flatlayer.length;a++){					
+					var c = flatlayer[a];					
+					if(cn.x==c.x && cn.y==c.y) {
+						flatlayer[a] = cn;
+						return;
+					}					
+				}
+				flatlayer.push(cn);
+			}
+			for(var i=0;i<sprite.layer.length;i++) {				
+				var component = sprite.layer[i].component;		
+				for(var j=0;j<component.length;j++) {			
+					addComponent(component[j]);
+				}		
+			}
+			return flatlayer;
+		}
+
+		// will contain x,y,colorindex
+		Sheet.flat.normalize = function(index){
+			let n = Commons.clone(Sheet.flat(index));
+			n.sort(function(a, b) { // order by x axis
+			    return a.x - b.x;
+			});
+			n.sort(function(a, b) { // order by y axis
+			    return a.y - b.y;
+			});
+			n.sort(function(a, b) { // order by color
+			    return a.colorindex - b.colorindex;
+			});
+			for(let i=0;i<n.length;i++){
+				if(n[i].x!=0){ n[i].x = n[i].x/pixelsize; }				
+				if(n[i].y!=0){ n[i].y = n[i].y/pixelsize; }
+				n[i].c = n[i].colorindex;
+				n[i].m = 1;
+				delete n[i].color;
+				delete n[i].colorindex;
+			}
+			return n;
+		}
+
+
+		// animation should be 
+		function Animate() { }
+
+		Animate.play = function(index) { 
+			// reuse animation based on 
+		}
+
+
+
+
+
+
+		function Dataport() { }
+
+		Dataport.spritesheetPNG = function() {
+			// export as PNG sprite sheet
+		}
+
+
+		/* 
+		  Export as the entire project as a compressed base92 string
+		  0: skip
+		  1-32: color
+		  32-: repeat horizontal count
+		  91: reserved delimeter
+		*/ 
+		Dataport.exportProject = function() {
+			for(let i=0;i<project.spritesheet.length;i++){
+				let c = Dataport.exportSheet(i);
+			}
+			
+		}
+
+		/* 
+		  Export as the entire project as a compressed base92 string
+		  Maximum 64x64 pixel art, 32 bit color
+		  c,xy
+		  0-31: coordinate
+		  32-63: color
+		  64-71: horizontal repeat max 8
+		  72-79: vertical repeat max 8
+		  80: delete pixel
+		  81: move horizontal (0-15 left 16-31 right) ,  move vertical (0-15 top 16-31 bottom)
+		  82: rotate ?
+		  83: blink / flash ?
+		  84: special animation ?
+		  85-88: delay frame 0-4
+		  89: tilemap delimeter
+		  90: animation delimeter
+		  91: reserved delimeter
+		*/ 
+
+		Dataport.exportSheet = function(index) {
+			let c = Sheet.flat.normalize(index);
+			let s = '';
+			var q = -1;
+
+			let findxy = function(x,y){
+				for(let i=0;i<c.length;i++){
+					if(c[i].x==x&&c[i].y==y) return i;
+				}	
+				return -1;
+			}
+
+			let countxcolor = function(x,y,l){
+				let t=0;
+				for(let i=1;i<9;i++){
+					let r = findxy(x+i,y);
+					if(  r > 0 && c[r].c==l) {
+						c[r].m=0;
+						t++;
+					}
+					else {
+						return t;
+					}
+				}
+				return 8;
+			}
+			let countycolor = function(x,y,l){
+				let t=0;
+				for(let i=1;i<9;i++){
+					let r = findxy(x,y+i);
+					if(  r > 0 && c[r].c==l) {
+						c[r].m=0;
+						t++;
+					}
+					else {
+						return t;
+					}
+				}
+				return 8;
+			}
+			
+			for(let i=0;i<c.length;i++){
+				if( c[i].m ){
+					if( q!=c[i].c ){ s+= Commons.base92((32+c[i].c)); q=c[i].c; }
+					if( c[i].x<32 && c[i].y<32 ) { s += Commons.base92(c[i].x)+Commons.base92(c[i].y); }					
+					c[i].m=0;
+					let t = countxcolor(c[i].x,c[i].y,c[i].c);
+					if(t>0){ s += Commons.base92(63+t); }	
+					let u = countycolor(c[i].x,c[i].y,c[i].c);
+					if(u>0){ s += Commons.base92(71+u); }	
+				}
+				
+			}
+			
+			return s;
+		}			
+
+		Dataport.import = function() {
+		}
+
+
+
+
+		function Commons() { }
+
+		Commons.clone = function(obj) {
+			return JSON.parse(JSON.stringify(obj));
+		}
+
+		Commons.base92 = function(b){
+			// 1. populate the base string
+			if( !Commons._base92 ) {
+				Commons._base92 = ''
+				for(var i=33;i<127;i++) Commons._base92 += (i!=34&&i!=92) ? String.fromCharCode(i) : '';
+			}
+			// 2. return the character or equivalent count
+			return typeof b == 'string' ? Commons._base92.indexOf(b) : Commons._base92.charAt(b);	
+		}
+		console.debug(Commons.base92('-'),Commons.base92(13),Commons.base92(14),Commons.base92(15));
+
+		Commons.base92.splitdelimeter = function(s) {	
+			return s.split(Commons.base92(91));
+		}
+
+		Commons.base92.putdelimeter = function(s) {	
+			return s+Commons.base92(91);
+		}	
+
+		Commons.base92.joinslice = function(ar,start,end) {	
+			return ar.slice(start,end).join(Commons.base92(122));
+		}	
+
+
+		Commons.base92.charAt = function(s,i) {
+			return Commons.base92(s.charAt(i));
+		}
+
+		Commons.base92.floor = function() {
+			var s = '';
+			for(var i=0;i<arguments.length;i++) s+=Commons.base92(Math.floor(arguments[i]));
+			return s;
+		}	
+
+		Commons.base92.binary = function(c) { // 6 digit binary value
+			var s = "";
+			for(var i=0;i<c.length;i++)
+				s += Commons.pad(8,Commons.convertBase(Commons.base92(c.charAt(i)),10,2)).substring(2);
+			return s
+		}
+
+		function $(id) {
+			return document.getElementById(id);
+		}
+
+	</script>
+	<style type="text/css">
+	</style>
+</head>
+<body>	
+	<div style="margin:0 auto; width:320px;">		
+		<div style="margin-bottom:4px;">
+			<button id="btn-new-project">New</button>
+			<button id="btn-save-project">Save</button>
+			<button id="btn-clone-project">Clone</button>
+			<button id="btn-delete-project">Delete</button>			
+			<input id="text-project-name" type="text" placeholder="Project Name" style="width:130px;" />	
+			<input id="text-upload-path" type="text" placeholder="Upload Path Converter" style="width:150px;" value="assets/Capture.PNG" >		
+			<button id="btn-upload-path">Upload</button>
+		</div>
+		<div style="margin-bottom:4px;">
+			<select id="select-project"></select>						
+		</div>
+		<div>
+			<canvas id="c"></canvas>
+		</div>
+		<div id="div-btn">
+			<button id="btn-grid-toggle">Grid</button>
+			<button id="btn-grid-draw">Draw</button>
+			<button id="btn-grid-erase">Erase</button>
+			<button id="btn-grid-move">Move</button>	
+			<button id="btn-color-byindex">Colour</button>		
+			<button id="btn-grid-erasefill">Erase Fill</button>		
+		</div>
+		<div>
+			<span>Pallete</span>
+		</div>
+		<div id="div-color-picker"></div> 
+		<div>
+			<span>Layers</span>
+			<button id="btn-layers-showhide">Show</button> 
+			<button id="btn-layers-delete">Remove</button> 
+			<button id="btn-layers-clone">Clone</button>
+			<button id="btn-layers-shiftleft">Shift Left</button>
+			<button id="btn-layers-shiftright">Shift Right</button>			
+			Brush Size<select id="select-pen-size"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
+		</div>
+		<div id="div-layers" style="overflow:auto;overflow-y:hidden;white-space:nowrap"></div>
+		
+		<div>
+			<span>Spirtesheet</span>
+			<button id="btn-sheets-showhide">Show</button> 
+			<button id="btn-sheets-delete">Remove</button> 
+			<button id="btn-sheets-clone">Clone</button>
+			<button id="btn-sheets-shiftleft">Shift Left</button>
+			<button id="btn-sheets-shiftright">Shift Right</button>
+			<button id="btn-sheets-add-animate">Add to animation</button>
+		</div>
+		<div id="div-sheets" style="overflow:auto;overflow-y:hidden;white-space:nowrap"></div>		
+		<div>
+			<span>Animation</span>
+			<select id="select-animate"></select>
+			<button id="btn-animate-delete">Remove</button> 
+			<button id="btn-animate-transition">Add Transform</button> 
+			<button id="btn-animate-shiftleft">Shift Left</button>
+			<button id="btn-animate-shiftright">Shift Right</button>
+		</div>
+		<div id="div-animate"></div>
+	</div>
+
+	<div style="position:absolute;right:20px;top:0px; width:200px; font-family:consolas; font-size:10px;">
+		<div>Exported String</div>
+		<div id="txt-exported"></div>
+	</div>
+</body>
+</html>

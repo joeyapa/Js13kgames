@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Drawpixel Rendering Sample</title>
+	<style type="text/css">		
+		canvas, img {
+			image-rendering: optimizeSpeed;             // Older versions of FF
+			image-rendering: -moz-crisp-edges;          // FF 6.0+
+			image-rendering: -webkit-crisp-edges;			
+			image-rendering: pixelated;
+			image-rendering: crisp-edges;               // Possible future browsers.
+			-ms-interpolation-mode: nearest-neighbor;
+		}
+	</style>
+	<script type="text/javascript">
+		
+
+		// create a temporary canvas
+		window.addEventListener('load',function(){		
+			let s = "ffffffead4aae8b796c28569b86f50e4a672d77643be4a2f733e393e2731a22633e43b44ff0044f6757ab5508868386cf77622feae34fee76163c74d3e8948265c42193c3e124e890099db2ce8f5c0cbdc8b9bb45a69883a4466262b44181425" // [0] pallete
+			+"~[IJKL" // [1] font color sets
+			+"~!!er'!dr,!dr1!dr6!dr;!dr%#n)#k4#l#$d($d7$<$c*%r(&d-&c2&c7&c#'d4'?'o3(<(>(c$)c()d2)=)%*r3*!+er'+q,+r1+p4+l6+em;+k(,d-,d2,d7,d<,e#-/-k=-n$.c*.l-.d2.c7.d4/k9/k(0d60el1eo+1ck01cm51c:1fk2dn2242>23cm%3l(3k*3k.3k337393<3c4l!4q,4244484l;4p#5d)5k-5k/5r15m55<5dk'6e,6e46r66el=6c*7k'8eq-8d28d78d<8d99k>9k(:dk,:em6:e<:d#;d);c-;d1;en<k%<*<m7<l$=(=d-=d6=d;=d#>k/>k(?d,?e2?d" // [2] font			
+			+"~D9.E$'+'-*),k2/<0c12k42%7F*)0.c:.;03124c15*7$8G:/c2314I</J#'$(k))).2.3/8/90c>032k43*4-545$7+8k$9K#&d+&d*(/*$+,+k1+l-,f$-/-d9-%.&/ek20c81?162>2$4)444.50525c-6l)7*8#9%9Q-+*-S9/21kV)+c1/40k91W51X3-6-c4../)0c10(1+5&7Y%'&(o')n%*ek(+l++%-e,.d5.k7.&1cm)1il>1%2dl*2h:2c'3dk+3g(4.4c&6d'7&8^%)7072c_*./.11:1c+4`$,*,c3.8.+/c0/6/c,05080%1<1c$2k*3,4ck%6%8a&','cm%('(()+)ck**d.*k2+ek%,4,k+-k.-5-8-&.d6.*/-/k//k4/'0+0.0d71(2<2ck04%5f/5)6e+7c'8,8b+(-(k)*/+c6+k3,5,e,-c2-(060k52l92k63gk=374*5(7&9,9cu9." // [3] main ship
+			Assets.init(s);
+
+
+			Assets.setText('rstuv',0,Assets.context,0,0,2); // s:text, i:indexcolor, c:canvas, x,y:coordinate, l:scale
+			//Assets.setText('vwxysd',0,Assets.context,0,12,1); // s:text, i:indexcolor, c:canvas, x,y:coordinate, l:scale
+			//Assets.setText('789012',0,Assets.context,0,12,1); // s:text, i:indexcolor, c:canvas, x,y:coordinate, l:scale
+		});
+
+
+
+		// load the image
+		// 
+		function Assets(){	}
+
+		Assets.dimension = 32;
+
+		Assets.palletestring = '';
+
+		Assets.pallete = [];
+
+		Assets.fontlist = [];
+
+		Assets.spritelist = [];
+
+		Assets.init = function(s) {
+			s = s.split('~');
+			Assets.palletestring = s[0];
+			Assets.open();			
+			Assets.addFont(s[1],s[2])
+			for(let i=3;i<s.length;i++){
+				Assets.addSprite(s[i]);				
+			}
+
+			Assets.close();
+		}
+
+		Assets.open = function(){
+			Assets.canvas = document.createElement('CANVAS'); 
+			Assets.context = Assets.canvas.getContext('2d');	
+			Assets.canvas.width = Assets.dimension; 
+			Assets.canvas.height = Assets.dimension;			
+			document.body.appendChild(Assets.canvas);
+
+			if( Assets.pallete.length==0 ) {
+				for(var i=0;i<Assets.palletestring.length;i=i+6){
+					Assets.pallete.push('#'+Assets.palletestring.substring(i,i+6));
+				}
+			}
+		}
+
+		Assets.close = function(){			
+			//Assets.canvas.outerHTML = "";				
+		}
+
+		Assets.addSprite = function(st){
+			let x=0,y=0,c=0,cr=0,an=st.split('}'),al=[];
+
+			Assets.context.clearRect(0, 0, Assets.dimension, Assets.dimension);
+			Assets.context.beginPath();
+
+			let rotatematrix = function(ar,task){		
+				// mirror horizontal								
+				//ar.reverse();
+				
+				// mirror vertical
+				for(let i=0;i<Assets.dimension;i++){
+					//ar[i].reverse();
+				}
+
+				let fr = function(ar,cyl,index,dd){
+					let cyl2 = cyl-(index*(cyl/16));
+					if( cyl2>0 ) {
+						for(let j=0;j<cyl2;j++){
+							ar = shiftrotate(ar,index,dd);
+						}		
+						ar = fr(ar,cyl,index+1,dd);
+					}		
+					return ar;								
+				}
+				
+				ar = fr(ar, 0, 0, 0);
+				
+
+				
+				// rotate side
+				return ar;
+			}
+
+			// shifting with compression, lower index should have a chance to move inside
+			let shiftrotate = function(ar,r,dd){
+				let d = ar.length-r, e=d-1, cc=dd?1:0, cw=dd?0:1, tar=JSON.parse(JSON.stringify(ar));
+
+				for(let y=r;y<d;y++){
+					for(let x=r;x<d;x++){
+						let v = tar[x][y];
+
+						if(y==r && x==r){ // corner top left
+							ar[x+cc][y+cw]=v;
+						}
+						else if(y==e && x==r){ // corner bottom left
+							ar[x+cw][y-cc]=v;
+						}
+						else if(y==r && x==e){ // corner top right
+							ar[x-cw][y+cc]=v;
+						}
+						else if(y==e && x==e){ // corner bottom right
+							ar[x-cc][y-cw]=v;
+						}
+						else if(y==r){ // first row
+							ar[x+cc-cw][y]=v;
+						}
+						else if(y==e){ // last row
+							ar[x-cc+cw][y]=v;
+						}	
+						else if(x==r){ // first column
+							ar[x][y-cc+cw]=v;
+						}
+						else if(x==e){ // last column
+							ar[x][y+cc-cw]=v;
+						}				
+					}
+				}
+
+				return ar;
+			}
+
+			let imagedatamatrix = function(d){
+				let ar = [];
+				for(let i=0;i<Assets.dimension;i++){					
+					let ae = [];
+					for(let j=0;j<Assets.dimension;j++){
+						ae.push([]);
+					}
+					ar.push(ae);
+				}
+				let pixels = d.data, x=0,y=0;
+				let l = Assets.dimension * Assets.dimension;
+				for (let i = 0; i < l; i++) {
+					// get color of pixel
+					let r = pixels[i*4]; // Red
+					let g = pixels[i*4+1]; // Green
+					let b = pixels[i*4+2]; // Blue
+					let a = pixels[i*4+3]; // Alpha
+
+					// get the position of pixel
+					//let y = parseInt(i / Assets.dimension, 10);
+					//let x = i - y * Assets.dimension;
+					//console.debug(x,y);
+					ar[x][y]=[r,g,b,a];
+					x++;
+					if(x==Assets.dimension) { x=0; y++; };
+					if(y==Assets.dimension) { break; }
+				}
+				return ar;
+			}
+
+			let imagedatalinear = function(ar){
+
+				let d = [];
+				for(let i=0;i<Assets.dimension;i++){										
+					for(let j=0;j<Assets.dimension;j++){
+						for(let k=0;k<4;k++){																					
+							d.push(ar[j][i][k]);
+						}						
+					}					
+				}
+				let md = Assets.context.createImageData(Assets.dimension, Assets.dimension);;
+				md.data.set(d);
+				return md;
+			}
+
+			// do the aimation here
+			for(let j=0;j<an.length;j++){
+				let s = an[j];
+				for(let i=0;i<s.length;i++){
+					let a = Base92.convert(s[i])				
+					if(a<32){
+						x = a;
+						y = Base92.convert(s[i+1]);					
+						if(cr==1){
+							Assets.context.clearRect(x, y, 1, 1);
+						}
+						else if(cr==2){
+							let tmp = Assets.context.getImageData(0, 0, Assets.dimension, Assets.dimension);
+							Assets.context.clearRect(0, 0, Assets.dimension, Assets.dimension);
+							Assets.context.putImageData(tmp,x-16,y-16);
+						}
+						else if(cr==3){ console.debug('rotate');						 	
+							let tmp = Assets.context.getImageData(0, 0, Assets.dimension, Assets.dimension);
+							Assets.context.clearRect(0, 0, Assets.dimension, Assets.dimension);
+							tmp = imagedatalinear( rotatematrix(imagedatamatrix(tmp)));
+							Assets.context.putImageData(tmp,0,0);			
+							
+						}
+						else {							
+							Assets.context.fillRect(x, y, 1, 1);
+						}
+
+						i+=1;
+					}
+					else if(a<64){
+						c = a-32;	
+						cr = 0;	
+						Assets.context.fillStyle=Assets.pallete[c];
+					}
+					else if(a<72){
+						a-=62;					
+						if(cr==1){
+							Assets.context.clearRect(x, y, a, 1);
+						}
+						else {
+							Assets.context.fillRect(x, y, a, 1);	
+						}						
+					}
+					else if(a<80){
+						a-=70;						
+						if(cr==1){
+							Assets.context.clearRect(x, y, 1, a);
+						}
+						else {
+							Assets.context.fillRect(x, y, 1, a);	
+						}						
+					}
+					else if(a==80){ // delete pixel
+						cr = 1;						
+					}
+					else if(a==81){ // move horizontal, vertical
+						cr = 2;	
+					}
+					else if(a==82){ // rotate
+						cr = 3;	console.debug('prepare');
+					}
+				}
+				
+				let image = new Image();
+				image.src = Assets.canvas.toDataURL();
+				Assets.spritelist.push({image:image});	
+			}
+			
+			
+			
+		}
+
+		Assets.addFont = function(c,s){ // colorset, font
+			for(let k=0;k<c.length;k++){
+				Assets.addSprite(c.charAt(k)+s);
+				Assets.loadFont(k);
+			}			
+		}
+
+		Assets.loadFont = function(index){
+			let x=0,y=0,c=0,d=5,f=[];
+			Assets.canvas.width = d; 
+			Assets.canvas.height = d;
+			for(let i=0;i<6;i++){
+				for(let j=0;j<6;j++){
+					let image = new Image();
+					Assets.context.clearRect(0, 0, d, d);		
+					Assets.context.drawImage(Assets.spritelist[index].image,j*d,i*d,d,d,0,0,d,d);
+					image.src = Assets.canvas.toDataURL();
+					f.push({image:image});
+					// document.body.appendChild(image);
+				}				
+			}
+			Assets.fontlist.push(f); //console.debug('Assets.fontlist',f);
+			Assets.canvas.width = Assets.dimension; 
+			Assets.canvas.height = Assets.dimension;
+		}
+
+		Assets.setText = function(s,i,c,x,y,l){ // s:text, i:indexcolor, c:canvas, x,y:coordinate, l:scale
+			let d=5,g=0,t="abcdefghiklmnoprstuvwxyz1234567890+- ",ar=["i1"," ","cef","","mtvwxy"];
+			c.imageSmoothingEnabled = false;			
+			c.save();
+			c.scale(l,l);			
+			for(let j=0;j<s.length;j++){				
+				let p = t.indexOf(s.charAt(j));									
+				c.drawImage(Assets.fontlist[i][p].image,0,0,d,d,x,y,d,d);
+				for(let arc=0;arc<ar.length;arc++){
+					g=d;
+					if(ar[arc].indexOf(s.charAt(j))!=-1){ 
+						g=arc+2;
+						break;
+					}
+				}
+				x=x+g;						
+			}		
+			c.restore();
+		}
+
+		function log(l){
+			console.debug(l);
+		}
+
+		function Base92() { }	
+
+		/**
+			populate the base string, return the character or equivalent count
+		 */
+		Base92.convert = function(b) {
+			if( !Base92._b ) {
+				Base92._b = ''; for(var i=33;i<127;i++) Base92._b += (i!=34&&i!=92) ? String.fromCharCode(i) : '';
+			}
+			return typeof b == 'string' ? Base92._b.indexOf(b) : Base92._b.charAt(b);	
+		}
+
+	</script>
+</head>
+<body>
+
+</body>
+</html>
